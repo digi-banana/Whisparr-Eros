@@ -11,6 +11,7 @@ using NzbDrone.Core.HealthCheck;
 using NzbDrone.Core.Housekeeping;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.IndexerSearch;
 using NzbDrone.Core.Lifecycle;
 using NzbDrone.Core.MediaFiles.Commands;
 using NzbDrone.Core.Messaging.Commands;
@@ -144,6 +145,13 @@ namespace NzbDrone.Core.Jobs
                         Interval = GetRefreshMonitoredInterval(),
                         TypeName = typeof(RefreshMonitoredDownloadsCommand).FullName,
                         Priority = CommandPriority.High
+                    },
+
+                    new ScheduledTask
+                    {
+                        Interval = PacedMissingSearchService.GetInterval(_configService),
+                        TypeName = typeof(PacedMissingSearchCommand).FullName,
+                        Priority = CommandPriority.Low
                     }
                 };
 
@@ -251,11 +259,15 @@ namespace NzbDrone.Core.Jobs
             var refreshMonitoredDownloads = _scheduledTaskRepository.GetDefinition(typeof(RefreshMonitoredDownloadsCommand));
             refreshMonitoredDownloads.Interval = GetRefreshMonitoredInterval();
 
-            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, refreshMonitoredDownloads, backup });
+            var pacedMissingSearch = _scheduledTaskRepository.GetDefinition(typeof(PacedMissingSearchCommand));
+            pacedMissingSearch.Interval = PacedMissingSearchService.GetInterval(_configService);
+
+            _scheduledTaskRepository.UpdateMany(new List<ScheduledTask> { rss, refreshMonitoredDownloads, backup, pacedMissingSearch });
 
             _cache.Find(rss.TypeName).Interval = rss.Interval;
             _cache.Find(backup.TypeName).Interval = backup.Interval;
             _cache.Find(refreshMonitoredDownloads.TypeName).Interval = refreshMonitoredDownloads.Interval;
+            _cache.Find(pacedMissingSearch.TypeName).Interval = pacedMissingSearch.Interval;
         }
     }
 }

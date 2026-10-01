@@ -59,6 +59,12 @@ namespace NzbDrone.Core.Configuration
         int AvailabilityDelay { get; set; }
 
         bool AllowHardcodedSubs { get; set; }
+
+        bool PacedMissingSearchEnabled { get; set; }
+        int PacedMissingSearchItemsPerRun { get; set; }
+        int PacedMissingSearchInterval { get; set; }
+        bool PacedMissingSearchIncludeMovies { get; set; }
+        bool PacedMissingSearchIncludeScenes { get; set; }
         string WhitelistedHardcodedSubs { get; set; }
 
         string ListSyncLevel { get; set; }

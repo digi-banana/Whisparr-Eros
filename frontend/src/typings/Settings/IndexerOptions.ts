@@ -18,4 +18,9 @@ export default interface IndexerOptions {
   // interface said `string[]`, which nothing on either side ever produced.
   whitelistedHardcodedSubs: string;
   allowHardcodedSubs: boolean;
+  pacedMissingSearchEnabled: boolean;
+  pacedMissingSearchItemsPerRun: number;
+  pacedMissingSearchInterval: number;
+  pacedMissingSearchIncludeMovies: boolean;
+  pacedMissingSearchIncludeScenes: boolean;
 }

@@ -215,6 +215,41 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("AllowHardcodedSubs", value); }
         }
 
+        public bool PacedMissingSearchEnabled
+        {
+            get { return GetValueBoolean("PacedMissingSearchEnabled", false); }
+
+            set { SetValue("PacedMissingSearchEnabled", value); }
+        }
+
+        public int PacedMissingSearchItemsPerRun
+        {
+            get { return GetValueInt("PacedMissingSearchItemsPerRun", 20); }
+
+            set { SetValue("PacedMissingSearchItemsPerRun", value); }
+        }
+
+        public int PacedMissingSearchInterval
+        {
+            get { return GetValueInt("PacedMissingSearchInterval", 60); }
+
+            set { SetValue("PacedMissingSearchInterval", value); }
+        }
+
+        public bool PacedMissingSearchIncludeMovies
+        {
+            get { return GetValueBoolean("PacedMissingSearchIncludeMovies", true); }
+
+            set { SetValue("PacedMissingSearchIncludeMovies", value); }
+        }
+
+        public bool PacedMissingSearchIncludeScenes
+        {
+            get { return GetValueBoolean("PacedMissingSearchIncludeScenes", true); }
+
+            set { SetValue("PacedMissingSearchIncludeScenes", value); }
+        }
+
         public string WhitelistedHardcodedSubs
         {
             get { return GetValue("WhitelistedHardcodedSubs", ""); }
