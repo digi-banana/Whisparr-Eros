@@ -13,6 +13,8 @@ namespace NzbDrone.Core.Notifications.Stash
         {
             RuleFor(c => c.Host).ValidHost();
             RuleFor(c => c.Port).ValidPort();
+            RuleFor(c => c.UrlBase).ValidUrlBase();
+            RuleFor(c => c.StashBoxEndpoint).IsValidUrl().When(c => c.MetadataIdentify && c.StashBoxEndpoint.IsNotNullOrWhiteSpace());
             RuleFor(c => c.MapFrom).NotEmpty().Unless(c => c.MapTo.IsNullOrWhiteSpace());
             RuleFor(c => c.MapTo).NotEmpty().Unless(c => c.MapFrom.IsNullOrWhiteSpace());
             RuleFor(c => c.GenerateImagePreviews)
@@ -24,12 +26,16 @@ namespace NzbDrone.Core.Notifications.Stash
 
     public class StashSettings : NotificationSettingsBase<StashSettings>, IProviderConfig
     {
-        private static readonly StashSettingsValidator Validator = new StashSettingsValidator();
+        private static readonly StashSettingsValidator Validator = new ();
 
         public StashSettings()
         {
             Port = 9999;
             StashBoxEndpoint = "https://stashdb.org/graphql";
+            GenerateCovers = true;
+            GeneratePreviews = true;
+            GenerateSprites = true;
+            GeneratePhashes = true;
         }
 
         [FieldDefinition(0, Label = "Host")]
@@ -38,59 +44,68 @@ namespace NzbDrone.Core.Notifications.Stash
         [FieldDefinition(1, Label = "Port")]
         public int Port { get; set; }
 
-        [FieldDefinition(2, Label = "Use SSL", Type = FieldType.Checkbox, HelpText = "Connect to Stash over HTTPS instead of HTTP")]
+        [FieldDefinition(2, Label = "UseSsl", Type = FieldType.Checkbox, HelpText = "NotificationsSettingsUseSslHelpText")]
+        [FieldToken(TokenField.HelpText, "UseSsl", "serviceName", "Stash")]
         public bool UseSsl { get; set; }
 
-        [FieldDefinition(3, Label = "API Key", Privacy = PrivacyLevel.ApiKey)]
+        [FieldDefinition(3, Label = "UrlBase", Type = FieldType.Textbox, Advanced = true, HelpText = "ConnectionSettingsUrlBaseHelpText")]
+        [FieldToken(TokenField.HelpText, "UrlBase", "connectionName", "Stash")]
+        [FieldToken(TokenField.HelpText, "UrlBase", "url", "http://[host]:[port]/[urlBase]/graphql")]
+        public string UrlBase { get; set; }
+
+        [FieldDefinition(4, Label = "ApiKey", HelpText = "NotificationsStashSettingsApiKeyHelpText", Privacy = PrivacyLevel.ApiKey)]
         public string ApiKey { get; set; }
 
-        [FieldDefinition(4, Label = "Scan: Generate Covers", HelpText = "Generate covers for new media during scan", Type = FieldType.Checkbox)]
+        [FieldDefinition(5, Label = "NotificationsStashSettingsGenerateCovers", HelpText = "NotificationsStashSettingsGenerateCoversHelpText", Type = FieldType.Checkbox)]
         public bool GenerateCovers { get; set; }
 
-        [FieldDefinition(5, Label = "Scan: Generate Previews", HelpText = "Generate previews for new media during scan", Type = FieldType.Checkbox)]
+        [FieldDefinition(6, Label = "NotificationsStashSettingsGeneratePreviews", HelpText = "NotificationsStashSettingsGeneratePreviewsHelpText", Type = FieldType.Checkbox)]
         public bool GeneratePreviews { get; set; }
 
-        [FieldDefinition(6, Label = "Scan: Generate Image Previews", HelpText = "Generate image previews for new media during scan", Type = FieldType.Checkbox)]
+        [FieldDefinition(7, Label = "NotificationsStashSettingsGenerateImagePreviews", HelpText = "NotificationsStashSettingsGenerateImagePreviewsHelpText", Type = FieldType.Checkbox)]
         public bool GenerateImagePreviews { get; set; }
 
-        [FieldDefinition(7, Label = "Scan: Generate Sprites", HelpText = "Generate sprites for new media during scan", Type = FieldType.Checkbox)]
+        [FieldDefinition(8, Label = "NotificationsStashSettingsGenerateSprites", HelpText = "NotificationsStashSettingsGenerateSpritesHelpText", Type = FieldType.Checkbox)]
         public bool GenerateSprites { get; set; }
 
-        [FieldDefinition(8, Label = "Scan: Generate Phashes", HelpText = "Generate phash for new media during scan", Type = FieldType.Checkbox)]
+        [FieldDefinition(9, Label = "NotificationsStashSettingsGeneratePhashes", HelpText = "NotificationsStashSettingsGeneratePhashesHelpText", Type = FieldType.Checkbox)]
         public bool GeneratePhashes { get; set; }
 
-        [FieldDefinition(9, Label = "Run Identify Task", HelpText = "Run Metadata Identify task on new files", Type = FieldType.Checkbox)]
+        [FieldDefinition(10, Label = "NotificationsStashSettingsGenerateThumbnails", HelpText = "NotificationsStashSettingsGenerateThumbnailsHelpText", Type = FieldType.Checkbox, Advanced = true)]
+        public bool GenerateThumbnails { get; set; }
+
+        [FieldDefinition(11, Label = "NotificationsStashSettingsIdentify", HelpText = "NotificationsStashSettingsIdentifyHelpText", Type = FieldType.Checkbox)]
         public bool MetadataIdentify { get; set; }
 
-        [FieldDefinition(10, Label = "Identify: Stash Box Endpoint", HelpText = "The Url for the Stash Box Endpoint (https://stashdb.org/graphql)", Type = FieldType.Textbox)]
+        [FieldDefinition(12, Label = "NotificationsStashSettingsIdentifyStashBoxEndpoint", HelpText = "NotificationsStashSettingsIdentifyStashBoxEndpointHelpText", Type = FieldType.Textbox)]
         public string StashBoxEndpoint { get; set; }
 
-        [FieldDefinition(11, Label = "Identify: Builtin Autotag", HelpText = "The Source Builtin Autotag", Type = FieldType.Checkbox)]
+        [FieldDefinition(13, Label = "NotificationsStashSettingsIdentifyBuiltinAutotag", HelpText = "NotificationsStashSettingsIdentifyBuiltinAutotagHelpText", Type = FieldType.Checkbox)]
         public bool BuiltinAutotag { get; set; }
 
-        [FieldDefinition(12, Label = "Identify: Include Male Performers", HelpText = "Include Male Performers during Identify task", Type = FieldType.Checkbox)]
+        [FieldDefinition(14, Label = "NotificationsStashSettingsIdentifyIncludeMalePerformers", HelpText = "NotificationsStashSettingsIdentifyIncludeMalePerformersHelpText", Type = FieldType.Checkbox)]
         public bool IncludeMalePerformers { get; set; }
 
-        [FieldDefinition(13, Label = "Identify: Set Cover Image", HelpText = "Set the cover image during Identify task", Type = FieldType.Checkbox)]
+        [FieldDefinition(15, Label = "NotificationsStashSettingsIdentifySetCoverImage", HelpText = "NotificationsStashSettingsIdentifySetCoverImageHelpText", Type = FieldType.Checkbox)]
         public bool SetCoverImage { get; set; }
 
-        [FieldDefinition(14, Label = "Identify: Skip Multiple Matches", HelpText = "Skip matches that have more than one result", Type = FieldType.Checkbox)]
+        [FieldDefinition(16, Label = "NotificationsStashSettingsIdentifySkipMultipleMatches", HelpText = "NotificationsStashSettingsIdentifySkipMultipleMatchesHelpText", Type = FieldType.Checkbox)]
         public bool SkipMultipleMatches { get; set; }
 
-        [FieldDefinition(15, Label = "Identify: Skip Multiple Match Tag ID", HelpText = "Tag ID skipped matches with", Type = FieldType.Number)]
+        [FieldDefinition(17, Label = "NotificationsStashSettingsIdentifySkipMultipleMatchTag", HelpText = "NotificationsStashSettingsIdentifySkipMultipleMatchTagHelpText", Type = FieldType.Number)]
         public int SkipMultipleMatchTag { get; set; }
 
-        [FieldDefinition(16, Label = "Identify: Set Organized", HelpText = "Use Set Organized during Identify task", Type = FieldType.Checkbox)]
+        [FieldDefinition(18, Label = "NotificationsStashSettingsIdentifySetOrganized", HelpText = "NotificationsStashSettingsIdentifySetOrganizedHelpText", Type = FieldType.Checkbox)]
         public bool SetOrganized { get; set; }
 
-        [FieldDefinition(17, Label = "Map Paths From", Type = FieldType.Textbox, Advanced = true, HelpText = "Whisparr Path, Used to modify site paths when Stash sees library path location differently from Whisparr")]
+        [FieldDefinition(19, Label = "NotificationsSettingsUpdateMapPathsFrom", HelpText = "NotificationsStashSettingsMapPathsFromHelpText", Type = FieldType.Textbox, Advanced = true)]
         public string MapFrom { get; set; }
 
-        [FieldDefinition(18, Label = "Map Paths To", Type = FieldType.Textbox, Advanced = true, HelpText = "Stash Path, Used to modify site paths when Stash sees library path location differently from Whisparr")]
+        [FieldDefinition(20, Label = "NotificationsSettingsUpdateMapPathsTo", HelpText = "NotificationsStashSettingsMapPathsToHelpText", Type = FieldType.Textbox, Advanced = true)]
         public string MapTo { get; set; }
 
         [JsonIgnore]
-        public string Address => $"{Host.ToUrlHost()}:{Port}";
+        public string Address => $"{Host.ToUrlHost()}:{Port}{UrlBase}";
 
         public bool IsValid => !string.IsNullOrWhiteSpace(Host) && Port > 0;
 

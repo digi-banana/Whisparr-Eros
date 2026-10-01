@@ -36,7 +36,10 @@ namespace NzbDrone.Core.Notifications.Stash
 
         public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
         {
-            _stashService.Clean(Settings, deleteMessage.Movie);
+            if (deleteMessage.DeletedFiles)
+            {
+                _stashService.Clean(Settings, deleteMessage.Movie);
+            }
         }
 
         public override ValidationResult Test()
