@@ -20,6 +20,11 @@ namespace Whisparr.Api.V3.Config
         public bool SearchStudioTitle { get; set; }
         public SearchDateFormatType SearchDateFormat { get; set; }
         public SearchStudioFormatType SearchStudioFormat { get; set; }
+        public bool PacedMissingSearchEnabled { get; set; }
+        public int PacedMissingSearchItemsPerRun { get; set; }
+        public int PacedMissingSearchInterval { get; set; }
+        public bool PacedMissingSearchIncludeMovies { get; set; }
+        public bool PacedMissingSearchIncludeScenes { get; set; }
     }
 
     public static class IndexerConfigResourceMapper
@@ -43,6 +48,11 @@ namespace Whisparr.Api.V3.Config
                 SearchStudioTitle = model.SearchStudioTitle,
                 SearchDateFormat = model.SearchDateFormat,
                 SearchStudioFormat = model.SearchStudioFormat,
+                PacedMissingSearchEnabled = model.PacedMissingSearchEnabled,
+                PacedMissingSearchItemsPerRun = model.PacedMissingSearchItemsPerRun,
+                PacedMissingSearchInterval = model.PacedMissingSearchInterval,
+                PacedMissingSearchIncludeMovies = model.PacedMissingSearchIncludeMovies,
+                PacedMissingSearchIncludeScenes = model.PacedMissingSearchIncludeScenes,
             };
         }
     }

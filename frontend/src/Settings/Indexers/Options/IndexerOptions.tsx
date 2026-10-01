@@ -227,6 +227,83 @@ function IndexerOptions({
           </Form>
         ) : null}
       </FieldSet>
+      {hasSettings && !error ? (
+        <FieldSet legend={translate('PacedMissingSearch')}>
+          <Form>
+            <FormGroup>
+              <FormLabel>{translate('Enable')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="pacedMissingSearchEnabled"
+                helpText={translate('PacedMissingSearchEnabledHelpText')}
+                onChange={handleInputChange}
+                {...settings.pacedMissingSearchEnabled}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>
+                {translate('PacedMissingSearchItemsPerRun')}
+              </FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.NUMBER}
+                name="pacedMissingSearchItemsPerRun"
+                min={1}
+                max={500}
+                helpText={translate('PacedMissingSearchItemsPerRunHelpText')}
+                onChange={handleInputChange}
+                {...settings.pacedMissingSearchItemsPerRun}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>{translate('Interval')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.NUMBER}
+                name="pacedMissingSearchInterval"
+                min={15}
+                unit="minutes"
+                helpText={translate('PacedMissingSearchIntervalHelpText', {
+                  minimum: 15,
+                })}
+                onChange={handleInputChange}
+                {...settings.pacedMissingSearchInterval}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>
+                {translate('PacedMissingSearchIncludeMovies')}
+              </FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="pacedMissingSearchIncludeMovies"
+                helpText={translate('PacedMissingSearchIncludeMoviesHelpText')}
+                onChange={handleInputChange}
+                {...settings.pacedMissingSearchIncludeMovies}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <FormLabel>
+                {translate('PacedMissingSearchIncludeScenes')}
+              </FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="pacedMissingSearchIncludeScenes"
+                helpText={translate('PacedMissingSearchIncludeScenesHelpText')}
+                onChange={handleInputChange}
+                {...settings.pacedMissingSearchIncludeScenes}
+              />
+            </FormGroup>
+          </Form>
+        </FieldSet>
+      ) : null}
       {showAdvancedSettings ? (
         <FieldSet legend={translate('AdvancedSearchOptions')}>
           <Form>

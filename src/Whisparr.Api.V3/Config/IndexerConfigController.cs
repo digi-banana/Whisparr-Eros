@@ -1,5 +1,6 @@
 using FluentValidation;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.IndexerSearch;
 using Whisparr.Http;
 using Whisparr.Http.Validation;
 
@@ -22,6 +23,12 @@ namespace Whisparr.Api.V3.Config
 
             SharedValidator.RuleFor(c => c.RssSyncInterval)
                            .IsValidRssSyncInterval();
+
+            SharedValidator.RuleFor(c => c.PacedMissingSearchItemsPerRun)
+                           .InclusiveBetween(1, PacedMissingSearchService.MaximumItemsPerRun);
+
+            SharedValidator.RuleFor(c => c.PacedMissingSearchInterval)
+                           .GreaterThanOrEqualTo(PacedMissingSearchService.MinimumInterval);
         }
 
         protected override IndexerConfigResource ToResource(IConfigService model)
