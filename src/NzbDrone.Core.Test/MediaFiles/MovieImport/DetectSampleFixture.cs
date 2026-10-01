@@ -3,6 +3,7 @@ using FizzWare.NBuilder;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.MediaFiles.MovieImport;
 using NzbDrone.Core.Movies;
@@ -24,6 +25,7 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
         {
             _movie = Builder<MovieMetadata>.CreateNew()
                                      .With(s => s.Runtime = 30)
+                                     .With(s => s.ItemType = ItemType.Movie)
                                      .Build();
 
             _localMovie = new LocalMovie
@@ -156,6 +158,145 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport
                              _localMovie.Path).Should().Be(DetectSampleResult.Indeterminate);
 
             ExceptionVerification.ExpectedErrors(1);
+        }
+
+        private void GivenScene(int runtimeMinutes, string path, long size)
+        {
+            _movie.ItemType = ItemType.Scene;
+            _movie.Runtime = runtimeMinutes;
+            _localMovie.Path = path;
+            _localMovie.Size = size;
+        }
+
+        private void GivenNoRuntime()
+        {
+            Mocker.GetMock<IVideoFileInfoReader>()
+                  .Setup(s => s.GetRunTime(It.IsAny<string>()))
+                  .Returns((TimeSpan?)null);
+        }
+
+        [Test]
+        public void should_return_not_sample_for_scene_with_unknown_expected_runtime_and_full_length_file()
+        {
+            GivenScene(0, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            GivenRuntime(25 * 60);
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.NotSample);
+        }
+
+        [Test]
+        public void should_use_media_info_from_import_for_scene()
+        {
+            GivenScene(0, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            _localMovie.MediaInfo = new MediaInfoModel { RunTime = TimeSpan.FromMinutes(25) };
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.NotSample);
+
+            Mocker.GetMock<IVideoFileInfoReader>().Verify(v => v.GetRunTime(It.IsAny<string>()), Times.Never());
+        }
+
+        [Test]
+        public void should_read_runtime_for_scene_if_media_info_is_missing()
+        {
+            GivenScene(30, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            GivenRuntime(25 * 60);
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.NotSample);
+
+            Mocker.GetMock<IVideoFileInfoReader>().Verify(v => v.GetRunTime(It.IsAny<string>()), Times.Once());
+        }
+
+        [TestCase(0)]
+        [TestCase(30)]
+        public void should_return_not_sample_for_large_scene_file_if_runtime_cannot_be_read(int expectedRuntime)
+        {
+            GivenScene(expectedRuntime, "/mnt/debrid/whisparr/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            GivenNoRuntime();
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.NotSample);
+
+            ExceptionVerification.ExpectedErrors(1);
+            ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_return_not_sample_for_scene_with_examples_in_name_if_runtime_cannot_be_read()
+        {
+            GivenScene(0, "/downloads/Studio - Kinky Examples/Studio - Kinky Examples.mp4", 650.Megabytes());
+            GivenNoRuntime();
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.NotSample);
+
+            ExceptionVerification.ExpectedErrors(1);
+            ExceptionVerification.ExpectedWarns(1);
+        }
+
+        [Test]
+        public void should_return_indeterminate_for_small_scene_file_if_runtime_cannot_be_read()
+        {
+            GivenScene(0, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 40.Megabytes());
+            GivenNoRuntime();
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Indeterminate);
+
+            ExceptionVerification.ExpectedErrors(1);
+        }
+
+        [TestCase("/downloads/Studio - Scene Title 1080p/studio-scene-title-1080p-sample.mp4")]
+        [TestCase("/downloads/Studio - Scene Title 1080p/Sample/studio-scene-title-1080p.mp4")]
+        [TestCase("/downloads/Studio - Scene Title 1080p/Samples/studio-scene-title-1080p.mp4")]
+        [TestCase("/downloads/Studio - Scene Title 1080p/Studio.Scene.Title.1080p.SAMPLE.mkv")]
+        public void should_return_indeterminate_for_scene_named_as_sample_if_runtime_cannot_be_read(string path)
+        {
+            GivenScene(0, path, 650.Megabytes());
+            GivenNoRuntime();
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Indeterminate);
+
+            ExceptionVerification.ExpectedErrors(1);
+        }
+
+        [TestCase(0, 10)]
+        [TestCase(30, 60)]
+        public void should_return_sample_for_short_scene_file(int expectedRuntime, int fileRuntimeSeconds)
+        {
+            GivenScene(expectedRuntime, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            GivenRuntime(fileRuntimeSeconds);
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Sample);
+        }
+
+        [Test]
+        public void should_return_sample_for_scene_with_zero_runtime_media_info()
+        {
+            GivenScene(0, "/downloads/Studio - Scene Title 1080p/Studio - Scene Title 1080p.mp4", 650.Megabytes());
+            _localMovie.MediaInfo = new MediaInfoModel { RunTime = TimeSpan.Zero };
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Sample);
+
+            ExceptionVerification.ExpectedErrors(1);
+        }
+
+        [Test]
+        public void should_return_indeterminate_for_large_movie_file_if_runtime_cannot_be_read()
+        {
+            _localMovie.Size = 4000.Megabytes();
+            GivenNoRuntime();
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Indeterminate);
+
+            ExceptionVerification.ExpectedErrors(1);
+        }
+
+        [Test]
+        public void should_not_use_media_info_from_import_for_movie()
+        {
+            _localMovie.MediaInfo = new MediaInfoModel { RunTime = TimeSpan.FromMinutes(90) };
+            GivenRuntime(60);
+
+            Subject.IsSample(_localMovie).Should().Be(DetectSampleResult.Sample);
+
+            Mocker.GetMock<IVideoFileInfoReader>().Verify(v => v.GetRunTime(It.IsAny<string>()), Times.Once());
         }
 
         private void ShouldBeSample()

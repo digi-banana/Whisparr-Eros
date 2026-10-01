@@ -1,19 +1,30 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NLog;
+using NzbDrone.Common;
+using NzbDrone.Common.Extensions;
 using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.Movies;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.MediaFiles.MovieImport
 {
     public interface IDetectSample
     {
         DetectSampleResult IsSample(MovieMetadata movie, string path);
+        DetectSampleResult IsSample(LocalMovie localMovie);
     }
 
     public class DetectSample : IDetectSample
     {
+        // A scene file whose runtime cannot be read is only treated as not being a sample at or above this size.
+        // Release samples are a few seconds to a minute of video and stay well below it.
+        public static readonly long SceneUnknownRuntimeMinimumSize = 100.Megabytes();
+
+        private static readonly Regex SampleNameRegex = new Regex(@"(?<![a-z0-9])samples?(?![a-z0-9])", RegexOptions.Compiled | RegexOptions.IgnoreCase, RegexDefaults.Timeout);
+
         private readonly IVideoFileInfoReader _videoFileInfoReader;
         private readonly Logger _logger;
 
@@ -24,6 +35,55 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
         }
 
         public DetectSampleResult IsSample(MovieMetadata movie, string path)
+        {
+            return IsSample(movie, path, () => _videoFileInfoReader.GetRunTime(path));
+        }
+
+        public DetectSampleResult IsSample(LocalMovie localMovie)
+        {
+            MovieMetadata movie = localMovie.Movie.MovieMetadata;
+
+            if (movie?.ItemType != ItemType.Scene)
+            {
+                return IsSample(movie, localMovie.Path);
+            }
+
+            // Re-use the media info read while augmenting the file rather than running ffprobe again;
+            // a second read is slow over network/FUSE mounts and can fail where the first one succeeded.
+            var result = IsSample(movie,
+                                  localMovie.Path,
+                                  () => localMovie.MediaInfo != null ? localMovie.MediaInfo.RunTime : _videoFileInfoReader.GetRunTime(localMovie.Path));
+
+            if (result != DetectSampleResult.Indeterminate)
+            {
+                return result;
+            }
+
+            return IsSceneSampleWithoutRuntime(localMovie);
+        }
+
+        private DetectSampleResult IsSceneSampleWithoutRuntime(LocalMovie localMovie)
+        {
+            var fileName = Path.GetFileName(localMovie.Path) ?? string.Empty;
+            var folderName = Path.GetFileName(Path.GetDirectoryName(localMovie.Path)) ?? string.Empty;
+
+            if (SampleNameRegex.IsMatch(fileName) || SampleNameRegex.IsMatch(folderName))
+            {
+                _logger.Debug("[{0}] runtime is unknown and its name suggests a sample", localMovie.Path);
+                return DetectSampleResult.Indeterminate;
+            }
+
+            if (localMovie.Size < SceneUnknownRuntimeMinimumSize)
+            {
+                _logger.Debug("[{0}] runtime is unknown and its size of {1} is below {2}", localMovie.Path, localMovie.Size.SizeSuffix(), SceneUnknownRuntimeMinimumSize.SizeSuffix());
+                return DetectSampleResult.Indeterminate;
+            }
+
+            _logger.Warn("Unable to read the runtime of [{0}], treating it as not a sample based on its size of {1}", localMovie.Path, localMovie.Size.SizeSuffix());
+            return DetectSampleResult.NotSample;
+        }
+
+        private DetectSampleResult IsSample(MovieMetadata movie, string path, Func<TimeSpan?> getRunTime)
         {
             var extension = Path.GetExtension(path);
 
@@ -48,8 +108,7 @@ namespace NzbDrone.Core.MediaFiles.MovieImport
                 }
             }
 
-            // TODO: Use MediaInfo from the import process, no need to re-process the file again here
-            var runTime = _videoFileInfoReader.GetRunTime(path);
+            var runTime = getRunTime();
 
             if (!runTime.HasValue)
             {
