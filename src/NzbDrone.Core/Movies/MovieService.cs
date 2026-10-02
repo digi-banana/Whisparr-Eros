@@ -757,6 +757,22 @@ namespace NzbDrone.Core.Movies
 
             var studios = _studioService.FindAllByTitle(parsedMovieInfo.StudioTitle);
 
+            // A scene cross-posted under several brands ("[8teenboy.com / HelixStudios.net]") may only be known under another one
+            foreach (var alternativeStudioTitle in parsedMovieInfo.AlternativeStudioTitles ?? new List<string>())
+            {
+                if (studios != null && studios.Count > 0)
+                {
+                    break;
+                }
+
+                studios = _studioService.FindAllByTitle(alternativeStudioTitle);
+
+                if (studios != null && studios.Count > 0)
+                {
+                    _logger.Debug("Studio '{0}' is unknown, using '{1}' from the same release", parsedMovieInfo.StudioTitle, alternativeStudioTitle);
+                }
+            }
+
             if (studios == null || studios.Count == 0)
             {
                 _logger.Debug("Could not find Studio name. '{0}'", parsedMovieInfo.StudioTitle);
@@ -767,7 +783,7 @@ namespace NzbDrone.Core.Movies
 
             foreach (var studio in studios)
             {
-                studioMatches.Add(FindByStudioAndReleaseDate(studio.ForeignId, parsedMovieInfo.ReleaseDate, parsedMovieInfo.ReleaseTokens, parsedMovieInfo.StashId, parsedMovieInfo.Episode, interactiveSearch));
+                studioMatches.Add(FindByStudioAndReleaseDate(studio.ForeignId, parsedMovieInfo.ReleaseDate, parsedMovieInfo.ReleaseTokens, parsedMovieInfo.StashId, parsedMovieInfo.Episode, interactiveSearch, parsedMovieInfo.IsDatelessScene ? parsedMovieInfo.Year : 0));
             }
 
             var movies = studioMatches.Where(m => m.Movie != null).Select(m => m.Movie).ToList();
@@ -1287,9 +1303,10 @@ namespace NzbDrone.Core.Movies
         /// <param name="foreignId">The foreign ID of the movie.</param>
         /// <param name="episode">The episode information, if applicable.</param>
         /// <param name="interactiveSearch">Indicates whether the search is interactive. Weak matches for releases without a date or episode are only accepted from an interactive search; an automatic search returns them as review candidates.</param>
+        /// <param name="datelessYear">The year of a release without a date ("[Site.com] Title (Performers) [2017, tags]"), 0 if none: scenes released more than a year apart from it are left out.</param>
         /// <remarks> This method employs fuzzy matching techniques to find the best match based on the provided parameters. </remarks>
         /// <returns>The match: the movie if found, or the candidates of a dateless release a human should confirm.</returns>
-        private SceneMatchResult FindByStudioAndReleaseDate(string studioForeignId, string releaseDate, string releaseTokens, string foreignId, string episode, bool interactiveSearch)
+        private SceneMatchResult FindByStudioAndReleaseDate(string studioForeignId, string releaseDate, string releaseTokens, string foreignId, string episode, bool interactiveSearch, int datelessYear)
         {
             var methodName = "FindByStudioAndReleaseDate";
             if (string.IsNullOrEmpty(studioForeignId))
@@ -1413,6 +1430,13 @@ namespace NzbDrone.Core.Movies
                 // Releases with neither date nor episode ("Studio - Title - Performers") are verified by match confidence below.
                 verifyEpisode = episode.IsNotNullOrWhiteSpace();
                 datelessRelease = !verifyEpisode;
+
+                // Trackers list the year a scene came out; a scene of the same name from another year is a different scene
+                if (datelessRelease && datelessYear > 0 && movies != null)
+                {
+                    movies = movies.Where(m => IsReleasedAround(m, datelessYear)).ToList();
+                    _logger.Debug("{0}: {1} scenes of Studio ForeignID: {2} released around {3}", methodName, movies.Count, studioForeignId, datelessYear);
+                }
             }
 
             if (movies == null || !movies.Any())
@@ -1499,6 +1523,19 @@ namespace NzbDrone.Core.Movies
                 default:
                     return false;
             }
+        }
+
+        // Released within a year of the given year; a scene without a release date can't be ruled out
+        private static bool IsReleasedAround(Movie movie, int year)
+        {
+            var releaseYear = movie.GetReleaseDate()?.Year ?? 0;
+
+            if (releaseYear == 0 && !int.TryParse(movie.MovieMetadata.Value.ReleaseDate?.Split('-')[0], out releaseYear))
+            {
+                releaseYear = movie.Year;
+            }
+
+            return releaseYear <= 0 || Math.Abs(releaseYear - year) <= 1;
         }
 
         private static int GetMatchTypeRank(MovieParseMatchType matchType)

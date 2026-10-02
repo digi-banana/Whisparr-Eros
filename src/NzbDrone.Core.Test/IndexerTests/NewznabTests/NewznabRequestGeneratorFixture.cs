@@ -232,5 +232,61 @@ namespace NzbDrone.Core.Test.IndexerTests.NewznabTests
             page.Url.Query.Should().Contain("q=Studio");
             page.Url.Query.Should().Contain("24.01.01");
         }
+
+        private SceneSearchCriteria GivenJoyRideSearch()
+        {
+            return new SceneSearchCriteria
+            {
+                Movie = new Movies.Movie { Title = "Joy Ride", ForeignId = "123" },
+                SceneTitles = new List<string> { "Helix Studios Joy Ride", "Helix Studios 17.06.09" },
+                TitleOnlySceneTitles = new List<string> { "Joy Ride" },
+                ReleaseDate = new System.DateOnly(2017, 06, 09)
+            };
+        }
+
+        private List<string> GetQueries(SceneSearchCriteria criteria)
+        {
+            return Subject.GetSearchRequests(criteria).GetAllTiers().Select(r => r.First().Url.Query).ToList();
+        }
+
+        [TestCase("raw")]
+        [TestCase("sphinx")]
+        public void should_search_scene_with_studio_and_date_by_default(string textSearchEngine)
+        {
+            _capabilities.SupportedMovieSearchParameters = new[] { "q" };
+            _capabilities.TextSearchEngine = textSearchEngine;
+
+            var queries = GetQueries(GivenJoyRideSearch());
+
+            queries.Should().HaveCount(2);
+            queries.Should().OnlyContain(q => q.Contains("Helix"));
+        }
+
+        [TestCase("raw")]
+        [TestCase("sphinx")]
+        public void should_search_scene_by_title_only_when_set(string textSearchEngine)
+        {
+            _capabilities.SupportedMovieSearchParameters = new[] { "q" };
+            _capabilities.TextSearchEngine = textSearchEngine;
+            Subject.Settings.SceneTitleOnlySearch = true;
+
+            var queries = GetQueries(GivenJoyRideSearch());
+
+            queries.Should().ContainSingle();
+            queries[0].Should().Contain("q=Joy%20Ride");
+            queries[0].Should().NotContain("Helix");
+        }
+
+        [Test]
+        public void should_search_scene_with_studio_when_set_to_title_only_but_no_titles_are_known()
+        {
+            _capabilities.SupportedMovieSearchParameters = new[] { "q" };
+            Subject.Settings.SceneTitleOnlySearch = true;
+
+            var criteria = GivenJoyRideSearch();
+            criteria.TitleOnlySceneTitles = new List<string>();
+
+            GetQueries(criteria).Should().HaveCount(2);
+        }
     }
 }
