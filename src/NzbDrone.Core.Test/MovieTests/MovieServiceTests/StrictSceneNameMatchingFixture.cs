@@ -147,7 +147,7 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
         [TestCase("Helix Studios - Hot Roommates - Kyle Ross [720p]", 5)]
 
         // The performer is the same words as the title
-        [TestCase("Helix Studios - Kyle Ross Returns [720p]", 6)]
+        [TestCase("Helix Studios - Kyle Ross Returns Home [720p]", 6)]
         public void should_send_title_and_performer_that_are_not_apart_to_review(string title, int id)
         {
             var match = FindSceneMatch(title, false);
@@ -161,7 +161,7 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
         }
 
         [TestCase("Helix Studios - Hot Roommates - Kyle Ross [720p]", 5)]
-        [TestCase("Helix Studios - Kyle Ross Returns [720p]", 6)]
+        [TestCase("Helix Studios - Kyle Ross Returns Home [720p]", 6)]
         public void should_match_title_and_performer_that_are_not_apart_when_strict_matching_is_off(string title, int id)
         {
             GivenStrictNameMatching(false);
