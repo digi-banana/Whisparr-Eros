@@ -44,11 +44,15 @@ namespace NzbDrone.Core.Movies.Credits
         public CreditPerformer()
         {
             Images = new List<MediaCover.MediaCover>();
+            Aliases = new List<string>();
         }
 
         public int Id { get; set; }
         public string Name { get; set; }
         public string Disambiguation { get; set; }
+
+        // Other names the performer is known by (StashDB aliases), taken from the performer record
+        public List<string> Aliases { get; set; }
         public string ForeignId { get; set; }
         public int TmdbId { get; set; }
         public string TpdbId { get; set; }

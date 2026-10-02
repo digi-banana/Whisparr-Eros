@@ -17,7 +17,8 @@ export type MovieParseMatchType =
   | 'characterTitle'
   | 'performersNotTitle'
   | 'charactersNotTitle'
-  | 'parsedTitleContainsCleanTitle';
+  | 'parsedTitleContainsCleanTitle'
+  | 'performersExact';
 
 export interface ReviewCandidate {
   movieId: number;

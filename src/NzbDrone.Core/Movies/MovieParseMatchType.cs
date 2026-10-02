@@ -13,6 +13,9 @@ namespace NzbDrone.Core.Movies
         CharacterTitle = 9,
         PerformersNotTitle = 10,
         CharactersNotTitle = 11,
-        ParsedTitleContainsCleanTitle = 12
+        ParsedTitleContainsCleanTitle = 12,
+
+        // Release without a date naming exactly the scene's performers (aliases included), see DatelessSceneEvidence
+        PerformersExact = 13
     }
 }

@@ -46,6 +46,8 @@ namespace NzbDrone.Core.Movies.Credits
 
                     creditPerformer.Id = performer?.Id ?? 0;
                     creditPerformer.Name = performer?.Name ?? string.Empty;
+                    creditPerformer.Disambiguation = performer?.Disambiguation ?? string.Empty;
+                    creditPerformer.Aliases = performer?.Aliases ?? new List<string>();
                     creditPerformer.ForeignId = performer?.ForeignId;
                     creditPerformer.TpdbId = performer?.TpdbId;
                     creditPerformer.TmdbId = performer?.TmdbId ?? 0;
