@@ -230,6 +230,35 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
         }
 
         [Test]
+        public void should_keep_exact_performers_with_a_contradicting_title_for_review()
+        {
+            // Joey Mills & Landon Vega are the performers of "Shower Sex", but the release has a different title
+            var match = FindSceneMatch("Helix Studios - Hot Afternoon - Joey Mills & Landon Vega [720p]", false);
+
+            match.Movie.Should().BeNull();
+            match.ReviewCandidates.Should().ContainSingle();
+            match.ReviewCandidates[0].Movie.Id.Should().Be(1);
+            match.ReviewCandidates[0].MatchType.Should().Be(MovieParseMatchType.PerformersNotTitle);
+        }
+
+        [Test]
+        public void should_prefer_the_scene_whose_title_is_in_the_release_when_performers_match_exactly()
+        {
+            Mocker.GetMock<IMovieRepository>()
+                .Setup(s => s.GetByStudioForeignId(StudioForeignId))
+                .Returns(new List<Movie>
+                {
+                    CreateScene(8, "Shower Fun", "2019-04-01", "Joey Mills", "Landon Vega"),
+                    CreateScene(1, "Shower Sex", "2019-03-01", "Joey Mills", "Landon Vega")
+                });
+
+            var match = FindSceneMatch("Helix Studios - Shower Sex - Joey Mills & Landon Vega [720p].mp4", false);
+
+            match.Movie.Should().NotBeNull();
+            match.Movie.Id.Should().Be(1);
+        }
+
+        [Test]
         public void should_not_offer_dated_release_for_review()
         {
             Mocker.GetMock<IMovieRepository>()

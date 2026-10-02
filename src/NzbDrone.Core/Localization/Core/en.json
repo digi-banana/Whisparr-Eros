@@ -2054,6 +2054,7 @@
   "ReviewMatchTypeEpisode": "Scene code",
   "ReviewMatchTypeParsedTitleContainsCleanTitle": "Title contained in release",
   "ReviewMatchTypePerformers": "All female performers",
+  "ReviewMatchTypePerformersExact": "All performers (incl. aliases)",
   "ReviewMatchTypePerformersNotTitle": "Performers only",
   "ReviewMatchTypePerformersTitle": "Title is a performer",
   "ReviewMatchTypePerformerTitle": "Title and performer",

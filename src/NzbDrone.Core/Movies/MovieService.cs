@@ -90,6 +90,25 @@ namespace NzbDrone.Core.Movies
         private static readonly Dictionary<string, int> RomanSequelTokens =
             RomanNumeralParser.GetArabicRomanNumeralsMapping().ToDictionary(m => m.RomanNumeralLowerCase, m => m.ArabicNumeral);
 
+        // Strongest first. PerformersExact (only used for releases without a date) ranks right after the scene code;
+        // the other match types keep their original order.
+        private static readonly MovieParseMatchType[] MatchTypePriority =
+        {
+            MovieParseMatchType.StashId,
+            MovieParseMatchType.Title,
+            MovieParseMatchType.Episode,
+            MovieParseMatchType.PerformersExact,
+            MovieParseMatchType.PerformersTitle,
+            MovieParseMatchType.CharactersTitle,
+            MovieParseMatchType.Performers,
+            MovieParseMatchType.Characters,
+            MovieParseMatchType.PerformerTitle,
+            MovieParseMatchType.CharacterTitle,
+            MovieParseMatchType.PerformersNotTitle,
+            MovieParseMatchType.CharactersNotTitle,
+            MovieParseMatchType.ParsedTitleContainsCleanTitle
+        };
+
         private readonly IMovieRepository _movieRepository;
         private readonly ICreditService _creditService;
         private readonly IStudioService _studioService;
@@ -787,6 +806,25 @@ namespace NzbDrone.Core.Movies
         /// <returns>A dictionary of matched movies and their corresponding match types.</returns>
         public Dictionary<Movie, MovieParseMatchType> MatchMovies(string parsedMovieTitle, string releaseDate, string foreignId, string episode, List<Movie> movies, bool verifyDate, bool verifyEpisode)
         {
+            return MatchMovies(parsedMovieTitle, releaseDate, foreignId, episode, movies, verifyDate, verifyEpisode, null);
+        }
+
+        /// <summary> Match parsed movie information against a list of movies. </summary>
+        /// <param name="parsedMovieTitle">The parsed title of the movie.</param>
+        /// <param name="releaseDate">The release date of the movie.</param>
+        /// <param name="foreignId">The foreign ID of the movie.</param>
+        /// <param name="episode">The episode information, if applicable.</param>
+        /// <param name="movies">A list of movies to match against.</param>
+        /// <param name="verifyDate">Indicates whether to verify the release date during matching.</param>
+        /// <param name="verifyEpisode">Indicates whether to verify the episode information during matching.</param>
+        /// <param name="datelessReleaseTokens">
+        /// The release tokens of a release without a date or episode, as parsed (not normalized). When set, scenes whose performers
+        /// the release names exactly (aliases included) are matched as <see cref="MovieParseMatchType.PerformersExact"/>, and the
+        /// issue / part numbers in the titles decide between scenes that match equally well.
+        /// </param>
+        /// <returns>A dictionary of matched movies and their corresponding match types.</returns>
+        private Dictionary<Movie, MovieParseMatchType> MatchMovies(string parsedMovieTitle, string releaseDate, string foreignId, string episode, List<Movie> movies, bool verifyDate, bool verifyEpisode, string datelessReleaseTokens)
+        {
             var matches = new Dictionary<Movie, MovieParseMatchType>();
 
             _logger.Debug("Checking {0} against {1} movies", parsedMovieTitle, movies.Count);
@@ -950,15 +988,18 @@ namespace NzbDrone.Core.Movies
                 }
             }
 
+            if (datelessReleaseTokens.IsNotNullOrWhiteSpace())
+            {
+                MatchExactPerformers(datelessReleaseTokens, movies, matches);
+            }
+
             // Find the best match
             if (matches.Count > 1)
             {
-                var movieParseMatchTypes = (MovieParseMatchType[])Enum.GetValues(typeof(MovieParseMatchType));
-
-                foreach (var movieMatchType in movieParseMatchTypes)
+                foreach (var movieMatchType in MatchTypePriority)
                 {
-                    var filteredMatches = matches.Where(m => (int)m.Value < (int)movieMatchType).ToDictionary(x => x.Key, x => x.Value);
-                    if (releaseDate.IsNotNullOrWhiteSpace() && (int)movieMatchType < 2)
+                    var filteredMatches = matches.Where(m => GetMatchTypeRank(m.Value) < GetMatchTypeRank(movieMatchType)).ToDictionary(x => x.Key, x => x.Value);
+                    if (releaseDate.IsNotNullOrWhiteSpace() && movieMatchType == MovieParseMatchType.StashId)
                     {
                         filteredMatches = new Dictionary<Movie, MovieParseMatchType>();
                     }
@@ -969,6 +1010,11 @@ namespace NzbDrone.Core.Movies
                         break;
                     }
                 }
+            }
+
+            if (matches.Count > 1 && datelessReleaseTokens.IsNotNullOrWhiteSpace())
+            {
+                matches = BreakDatelessTie(parsedMovieTitle, datelessReleaseTokens, matches);
             }
 
             if (matches.Count == 1 && (verifyDate || verifyEpisode))
@@ -1380,7 +1426,7 @@ namespace NzbDrone.Core.Movies
 
             if (parsedMovieTitle.IsNotNullOrWhiteSpace() || foreignId.IsNotNullOrWhiteSpace())
             {
-                var matches = MatchMovies(parsedMovieTitle, releaseDate, foreignId, episode, movies, verifyDate, verifyEpisode);
+                var matches = MatchMovies(parsedMovieTitle, releaseDate, foreignId, episode, movies, verifyDate, verifyEpisode, datelessRelease ? releaseTokens : null);
 
                 _logger.Debug("{0}: Found {1} matches for Studio ForeignID: {2}, Date: {3}, Parsed Title: {4}, ForeignID: {5}",
                             methodName,
@@ -1448,10 +1494,98 @@ namespace NzbDrone.Core.Movies
                 case MovieParseMatchType.Title:
                 case MovieParseMatchType.Episode: // scene code and title both in the release name
                 case MovieParseMatchType.PerformerTitle:
+                case MovieParseMatchType.PerformersExact: // every performer named, aliases included, title not contradicting
                     return true;
                 default:
                     return false;
             }
+        }
+
+        private static int GetMatchTypeRank(MovieParseMatchType matchType)
+        {
+            var rank = Array.IndexOf(MatchTypePriority, matchType);
+
+            return rank < 0 ? MatchTypePriority.Length : rank;
+        }
+
+        /// <summary>
+        /// Upgrades scenes whose performers a dateless release names exactly (aliases and credited names included)
+        /// to <see cref="MovieParseMatchType.PerformersExact"/>, unless their numbers conflict (issue more than one apart, part / scene different).
+        /// Matches on StashDB ID, title or scene code are kept as they are.
+        /// </summary>
+        private void MatchExactPerformers(string releaseTokens, List<Movie> movies, Dictionary<Movie, MovieParseMatchType> matches)
+        {
+            foreach (var movie in movies)
+            {
+                if (matches.TryGetValue(movie, out var matchType) && GetMatchTypeRank(matchType) < GetMatchTypeRank(MovieParseMatchType.PerformersExact))
+                {
+                    continue;
+                }
+
+                var metadata = movie.MovieMetadata.Value;
+
+                if (metadata.Credits == null || !metadata.Credits.Any())
+                {
+                    metadata.Credits = _creditService.GetAllCreditsForMovieMetadata(metadata.Id);
+                }
+
+                if (!DatelessSceneEvidence.HasExactPerformers(releaseTokens, movie))
+                {
+                    continue;
+                }
+
+                if (DatelessSceneEvidence.CompareNumbers(releaseTokens, movie.Title).Conflict)
+                {
+                    _logger.Debug("Release '{0}' names the performers of {1}, but the issue / part / scene numbers don't fit", releaseTokens, movie);
+                    continue;
+                }
+
+                _logger.Debug("Match {0} against {1} [Performers Exact]", releaseTokens, movie);
+                matches[movie] = MovieParseMatchType.PerformersExact;
+            }
+        }
+
+        /// <summary>
+        /// Decides between scenes that match a dateless release equally well: the scenes whose issue / part numbers equal the release's,
+        /// then (for exact performer matches) the scenes whose title is in the release name. Numbers never add a scene, they only pick one.
+        /// </summary>
+        /// <returns>The single best scene; for exact performer matches that stay tied, only those scenes; otherwise the matches unchanged.</returns>
+        private Dictionary<Movie, MovieParseMatchType> BreakDatelessTie(string parsedMovieTitle, string releaseTokens, Dictionary<Movie, MovieParseMatchType> matches)
+        {
+            var bestRank = matches.Min(m => GetMatchTypeRank(m.Value));
+            var best = matches.Where(m => GetMatchTypeRank(m.Value) == bestRank).ToList();
+
+            if (best.Count > 1)
+            {
+                var numbers = best.Select(m => (Match: m, Exact: DatelessSceneEvidence.CompareNumbers(releaseTokens, m.Key.Title).ExactMatches)).ToList();
+                var mostExact = numbers.Max(n => n.Exact);
+
+                best = numbers.Where(n => n.Exact == mostExact).Select(n => n.Match).ToList();
+            }
+
+            var exactPerformers = best[0].Value == MovieParseMatchType.PerformersExact;
+
+            if (best.Count > 1 && exactPerformers)
+            {
+                var titled = best.Where(m => m.Key.Title.IsNotNullOrWhiteSpace() &&
+                                             parsedMovieTitle.Contains(Parser.Parser.NormalizeEpisodeTitle(m.Key.Title), StringComparison.InvariantCultureIgnoreCase))
+                                 .ToList();
+
+                if (titled.Any())
+                {
+                    best = titled;
+                }
+            }
+
+            if (best.Count == 1)
+            {
+                _logger.Debug("Release '{0}' matches {1} scenes, {2} [{3}] matches best", releaseTokens, matches.Count, best[0].Key, best[0].Value);
+
+                return best.ToDictionary(m => m.Key, m => m.Value);
+            }
+
+            // Scenes with the same performers that nothing tells apart: only they are worth a human's look
+            return exactPerformers ? best.ToDictionary(m => m.Key, m => m.Value) : matches;
         }
     }
 }
