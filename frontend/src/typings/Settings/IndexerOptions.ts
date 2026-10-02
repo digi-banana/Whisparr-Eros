@@ -9,6 +9,7 @@ export default interface IndexerOptions {
   searchDateFormat: string;
   searchTitleDate: boolean;
   searchTitleOnly: boolean;
+  strictSceneNameMatching: boolean;
   maximumSize: number;
   rssSyncInterval: number;
   preferIndexerFlags: boolean;

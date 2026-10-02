@@ -90,7 +90,8 @@ namespace NzbDrone.Core.Movies
         private static readonly Dictionary<string, int> RomanSequelTokens =
             RomanNumeralParser.GetArabicRomanNumeralsMapping().ToDictionary(m => m.RomanNumeralLowerCase, m => m.ArabicNumeral);
 
-        // Strongest first. PerformersExact (only used for releases without a date) ranks right after the scene code;
+        // Strongest first. PerformersExact (only used for releases without a date) ranks right after the scene code,
+        // PerformerTitleUnconfirmed (strict name matching) right after the title and performer matches it was;
         // the other match types keep their original order.
         private static readonly MovieParseMatchType[] MatchTypePriority =
         {
@@ -104,6 +105,7 @@ namespace NzbDrone.Core.Movies
             MovieParseMatchType.Characters,
             MovieParseMatchType.PerformerTitle,
             MovieParseMatchType.CharacterTitle,
+            MovieParseMatchType.PerformerTitleUnconfirmed,
             MovieParseMatchType.PerformersNotTitle,
             MovieParseMatchType.CharactersNotTitle,
             MovieParseMatchType.ParsedTitleContainsCleanTitle
@@ -988,6 +990,11 @@ namespace NzbDrone.Core.Movies
                 }
             }
 
+            if (datelessReleaseTokens.IsNotNullOrWhiteSpace() && _configService.StrictSceneNameMatching)
+            {
+                ApplyStrictNameMatching(datelessReleaseTokens, matches);
+            }
+
             if (datelessReleaseTokens.IsNotNullOrWhiteSpace())
             {
                 MatchExactPerformers(datelessReleaseTokens, movies, matches);
@@ -1506,6 +1513,50 @@ namespace NzbDrone.Core.Movies
             var rank = Array.IndexOf(MatchTypePriority, matchType);
 
             return rank < 0 ? MatchTypePriority.Length : rank;
+        }
+
+        /// <summary>
+        /// Strict name matching for a dateless release. The title and performer checks above compare text, so the scene "Alex"
+        /// (performer "Alex") is in "Extra Credit - Alex Killborn &amp; Tyler Hill" twice over. Here a title-and-performer match must name
+        /// both as whole words in different places of the release (see <see cref="DatelessSceneEvidence.HasSeparateTitleAndPerformer"/>),
+        /// otherwise it becomes <see cref="MovieParseMatchType.PerformerTitleUnconfirmed"/>, which an automatic search sends to review.
+        /// A title that isn't in the release as whole words ("Alex" in "Alexander") doesn't count: a title-and-performer match is left
+        /// with the performer (performers only), a match on the title alone is dropped.
+        /// </summary>
+        private void ApplyStrictNameMatching(string releaseTokens, Dictionary<Movie, MovieParseMatchType> matches)
+        {
+            var titleMatchTypes = new[]
+            {
+                MovieParseMatchType.PerformerTitle,
+                MovieParseMatchType.CharacterTitle,
+                MovieParseMatchType.ParsedTitleContainsCleanTitle
+            };
+
+            foreach (var (movie, matchType) in matches.Where(m => titleMatchTypes.Contains(m.Value)).ToList())
+            {
+                if (!DatelessSceneEvidence.ContainsTitle(releaseTokens, movie.Title))
+                {
+                    _logger.Debug("Release '{0}' doesn't have the title of {1} as whole words, strict name matching doesn't count it for the [{2}] match", releaseTokens, movie, matchType);
+
+                    switch (matchType)
+                    {
+                        case MovieParseMatchType.PerformerTitle:
+                            matches[movie] = MovieParseMatchType.PerformersNotTitle;
+                            break;
+                        case MovieParseMatchType.CharacterTitle:
+                            matches[movie] = MovieParseMatchType.CharactersNotTitle;
+                            break;
+                        default:
+                            matches.Remove(movie);
+                            break;
+                    }
+                }
+                else if (matchType != MovieParseMatchType.ParsedTitleContainsCleanTitle && !DatelessSceneEvidence.HasSeparateTitleAndPerformer(releaseTokens, movie))
+                {
+                    _logger.Debug("Release '{0}' doesn't name the title and a performer of {1} apart, strict name matching can't confirm the [{2}] match", releaseTokens, movie, matchType);
+                    matches[movie] = MovieParseMatchType.PerformerTitleUnconfirmed;
+                }
+            }
         }
 
         /// <summary>

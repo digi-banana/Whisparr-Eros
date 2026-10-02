@@ -363,6 +363,26 @@ function IndexerOptions({
           </Form>
         </FieldSet>
       ) : null}
+      {hasSettings && !error ? (
+        <FieldSet legend={translate('SceneMatching')}>
+          <Form>
+            <FormGroup>
+              <FormLabel>{translate('StrictSceneNameMatching')}</FormLabel>
+
+              <FormInputGroup
+                type={inputTypes.CHECK}
+                name="strictSceneNameMatching"
+                helpText={translate('StrictSceneNameMatchingHelpText')}
+                helpTextWarning={`${translate('Default')}: ${translate(
+                  'Enabled'
+                )}`}
+                onChange={handleInputChange}
+                {...settings.strictSceneNameMatching}
+              />
+            </FormGroup>
+          </Form>
+        </FieldSet>
+      ) : null}
     </div>
   );
 }

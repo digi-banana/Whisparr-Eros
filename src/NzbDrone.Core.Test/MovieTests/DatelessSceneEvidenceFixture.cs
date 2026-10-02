@@ -164,5 +164,53 @@ namespace NzbDrone.Core.Test.MovieTests
             result.Conflict.Should().Be(conflict);
             result.ExactMatches.Should().Be(exact);
         }
+
+        [TestCase("Shower Sex - Joey Mills & Landon Vega", "Shower Sex", "Joey Mills")]
+        [TestCase("Joey Mills & Landon Vega - Shower Sex", "Shower Sex", "Landon Vega")]
+        [TestCase("Poolside - Dakota Lovell", "Poolside", "Dakota Lovell")]
+        [TestCase("Poolside (Dakota Lovell)", "Poolside", "Dakota Lovell")]
+        [TestCase("Joy Ride / 5003 (Blake Mitchell, Noah White)", "Joy Ride", "Noah White")]
+        [TestCase("Alex - Alex", "Alex", "Alex")]
+        [TestCase("Alex & Gato - Alex", "Alex", "Gato")]
+        [TestCase("Fun and Games - Kyle Ross", "Fun & Games", "Kyle Ross")]
+        [TestCase("Blake Mitchell's Birthday - Blake Mitchell & Noah White", "Blake Mitchell's Birthday", "Blake Mitchell")]
+        public void should_find_title_and_performer_apart(string releaseTokens, string title, string performer)
+        {
+            DatelessSceneEvidence.HasSeparateTitleAndPerformer(releaseTokens, Scene(title, "Helix Studios", Credit(performer))).Should().BeTrue();
+        }
+
+        // A one-word title or name that is part of a longer name
+        [TestCase("Helix Academy Extra Credit - Alex Killborn & Tyler Hill", "Alex", "Alex")]
+        [TestCase("Hot Roommates - Kyle Ross", "Roommates", "Kyle Ross")]
+        [TestCase("Poolside - Dakota Lovell", "Poolside", "Dakota")]
+
+        // The performer is the same words as the title
+        [TestCase("Kyle Ross Returns", "Kyle Ross Returns", "Kyle Ross")]
+
+        // Only part of a word
+        [TestCase("Alexander & Gato", "Alex", "Gato")]
+        [TestCase("Shower Sex - Joey Millson", "Shower Sex", "Joey Mills")]
+        public void should_not_find_title_and_performer_apart(string releaseTokens, string title, string performer)
+        {
+            DatelessSceneEvidence.HasSeparateTitleAndPerformer(releaseTokens, Scene(title, "Helix Studios", Credit(performer))).Should().BeFalse();
+        }
+
+        [Test]
+        public void should_find_title_and_performer_by_alias()
+        {
+            var scene = Scene("Poolside", "Helix Studios", Credit("Michal Renok", null, "Gene Allen"));
+
+            DatelessSceneEvidence.HasSeparateTitleAndPerformer("Poolside - Gene Allen", scene).Should().BeTrue();
+        }
+
+        [TestCase("Helix Academy Extra Credit - Alex Killborn", "Alex", true)]
+        [TestCase("Alexander & Gato", "Alex", false)]
+        [TestCase("Fun and Games", "Fun & Games", true)]
+        [TestCase("Shower.Sex.Joey.Mills", "Shower Sex", true)]
+        [TestCase("Showers Sex", "Shower Sex", false)]
+        public void should_find_title_as_whole_words(string releaseTokens, string title, bool expected)
+        {
+            DatelessSceneEvidence.ContainsTitle(releaseTokens, title).Should().Be(expected);
+        }
     }
 }

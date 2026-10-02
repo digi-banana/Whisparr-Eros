@@ -20,6 +20,7 @@ namespace Whisparr.Api.V3.Config
         public bool SearchStudioTitle { get; set; }
         public SearchDateFormatType SearchDateFormat { get; set; }
         public SearchStudioFormatType SearchStudioFormat { get; set; }
+        public bool StrictSceneNameMatching { get; set; }
     }
 
     public static class IndexerConfigResourceMapper
@@ -43,6 +44,7 @@ namespace Whisparr.Api.V3.Config
                 SearchStudioTitle = model.SearchStudioTitle,
                 SearchDateFormat = model.SearchDateFormat,
                 SearchStudioFormat = model.SearchStudioFormat,
+                StrictSceneNameMatching = model.StrictSceneNameMatching,
             };
         }
     }
