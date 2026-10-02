@@ -11,6 +11,7 @@ namespace NzbDrone.Core.Parser.Model
         {
             MovieTitles = new List<string>();
             Languages = new List<Language>();
+            AlternativeStudioTitles = new List<string>();
         }
 
         public List<string> MovieTitles { get; set; }
@@ -18,6 +19,9 @@ namespace NzbDrone.Core.Parser.Model
         public string ReleaseTitle { get; set; }
         public string SimpleReleaseTitle { get; set; }
         public string StudioTitle { get; set; }
+
+        // The other brands of a cross-posted scene ("[SiteA.com / SiteB.com]"), tried when StudioTitle isn't a known studio
+        public List<string> AlternativeStudioTitles { get; set; }
         public QualityModel Quality { get; set; }
         public List<Language> Languages { get; set; }
         public string FirstPerformer { get; set; }

@@ -113,6 +113,15 @@ namespace NzbDrone.Core.Indexers.Newznab
                 var raw = TextSearchEngine == "raw";
                 var queryTitles = raw ? searchCriteria.SceneTitles : searchCriteria.CleanSceneTitles;
 
+                // Indexers whose release names don't start with the studio ("[Site.com] Title (Performers) [Year, tags]")
+                // find nothing for "Studio Title" or "Studio yy.MM.dd", only for the title itself
+                if (Settings.SceneTitleOnlySearch && searchCriteria.TitleOnlySceneTitles.Any())
+                {
+                    queryTitles = raw
+                        ? searchCriteria.TitleOnlySceneTitles
+                        : searchCriteria.TitleOnlySceneTitles.Select(SearchCriteriaBase.GetCleanSceneTitle).Distinct().ToList();
+                }
+
                 var releaseDateStrings = new Dictionary<string, string>();
                 if (searchCriteria.ReleaseDate != null)
                 {

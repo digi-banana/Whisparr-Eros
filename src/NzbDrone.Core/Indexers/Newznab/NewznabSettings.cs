@@ -86,7 +86,10 @@ namespace NzbDrone.Core.Indexers.Newznab
         [FieldDefinition(7, Type = FieldType.Checkbox, Label = "IndexerSettingsRemoveYear", HelpText = "IndexerSettingsRemoveYearHelpText", Advanced = true)]
         public bool RemoveYear { get; set; }
 
-        // Field 8 is used by TorznabSettings MinimumSeeders
+        [FieldDefinition(8, Type = FieldType.Checkbox, Label = "IndexerSettingsSceneTitleOnlySearch", HelpText = "IndexerSettingsSceneTitleOnlySearchHelpText", Advanced = true)]
+        public bool SceneTitleOnlySearch { get; set; }
+
+        // Fields 9 and up are used by TorznabSettings (MinimumSeeders, ...)
         // If you need to add another field here, update TorznabSettings as well and this comment
         public virtual NzbDroneValidationResult Validate()
         {

@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Parser
         private const string EpisodeConst = "episode";
         private const string ImdbIdConst = "imdbid";
         private const string StashIdConst = "stashid";
+        private const string TagYearConst = "tagyear";
         private const string TitleYearConst = "titleyear";
         private const string TmdbIdConst = "tmdbid";
         private static readonly Logger Logger = NzbDroneLogger.GetLogger(typeof(Parser));
@@ -49,6 +50,19 @@ namespace NzbDrone.Core.Parser
                                                                            @"(?:[\s._~+-]*(?:[\[(][\s+,&._-]*(?:(?:\d{3,4}[pi]|4k|uhd|hd|sd|hevc|avc|x26[45]|h26[45]|photo\s?sets?|photos|pics|web-?dl|web-?rip)[\s+,&._-]*)*[\])]|\b(?:hevc|avc|xxx|web-?dl|web-?rip|\d{3,4}[pi]|mp4|mkv|avi|wmv|m4v|mov)\b))*[\s._~+-]*$",
                                                                            RegexOptions.IgnoreCase | RegexOptions.Compiled,
                                                                            RegexDefaults.Timeout);
+
+        // Scene release names with the site in brackets and the year (no date) in a bracketed list of tags, as on PornoLab:
+        // "[HelixStudios.net] Joy Ride / 5003 (Blake Mitchell, Noah White) [2017 г., Blowjob, Anal, 1080p]"
+        // The tags start with a single year (a range is a compilation), followed by "г." (Russian for year, often stripped), "." or ",".
+        // A plain "[Studio] Title [2024]" stays a movie. Declared before ReportTitleRegex, which references it.
+        private static readonly Regex SiteTitleYearTagsRegex = new Regex(@"^(?<" + DatelessConst + @">)\[(?=[^\]]*[a-z])(?<studiotitle>[a-z0-9][^\[\]]{1,79}?)\]\s*" +
+                                                                         @"(?<releasetoken>[^\[\]]*?[a-z][^\[\]]*?)\s*" +
+                                                                         @"\[(?<" + TagYearConst + @">(?:19|20)\d{2})(?![\d-])\s*(?:г\.?|\.)?\s*[,.][^\]]*\]",
+                                                                         RegexOptions.IgnoreCase | RegexOptions.Compiled,
+                                                                         RegexDefaults.Timeout);
+
+        // An alternative title that is left empty once Cyrillic is stripped: "Title /  (Performers)", "Title /"
+        private static readonly Regex EmptyAlternativeTitleRegex = new Regex(@"\s+/\s*(?=\(|$)", RegexOptions.Compiled, RegexDefaults.Timeout);
 
         private static readonly Regex[] ReportTitleRegex = new[]
         {
@@ -137,6 +151,11 @@ namespace NzbDrone.Core.Parser
             new Regex(@"\[(?<studiotitle>.+?)?\].?[(]+(?<episode>[eE]+\d{1,6})?[\)]",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled,
                 RegexDefaults.Timeout),
+
+            // SCENE with the site in brackets and the year in the tags, before the movie patterns which would take the year
+            // [HelixStudios.net] Joy Ride / 5003 (Blake Mitchell, Noah White) [2017 г., Blowjob, Anal, Big Dick, 1080p]
+            // [8teenboy.com / HelixStudios.net] Pretty Boy Pound Down (Trevor Harris, Austin Lovett) [2020 ., Twinks, Bareback]
+            SiteTitleYearTagsRegex,
 
             // Some german or french tracker formats (missing year, ...) (Only applies to german and TrueFrench releases) - see ParserFixture for examples and tests - french removed as it broke all movies w/ french titles
             new Regex(@"^(?<title>(?![(\[]).+?)((\W|_))(" + EditionRegex + @".{1,3})?(?:(?<!(19|20)\d{2}.*?)(?<!(?:Good|The)[_ .-])(German|TrueFrench))(.+?)(?=((19|20)\d{2}|$))(?<year>(19|20)\d{2}(?!p|i|\d+|\]|\W\d+))?(\W+|_|$)(?!\\)", RegexOptions.IgnoreCase | RegexOptions.Compiled, RegexDefaults.Timeout),
@@ -302,6 +321,14 @@ namespace NzbDrone.Core.Parser
 
         // The brands a cross-posted scene is listed under are separated by one of these.
         private static readonly char[] StudioBrandSeparators = { '/', '|' };
+
+        // A studio name from one brand of a release's site tag: "HelixStudios.net" is "HelixStudios"
+        private static string GetStudioTitle(string brand)
+        {
+            var studioTitle = StudioDomainSuffixRegex.Replace(brand, string.Empty).Replace('.', ' ').Replace('_', ' ');
+
+            return RequestInfoRegex.Replace(studioTitle, "").Trim(' ');
+        }
 
         public static ParsedMovieInfo ParseMoviePath(string path)
         {
@@ -1043,11 +1070,16 @@ namespace NzbDrone.Core.Parser
                 // "[SiteA.com / SiteB.com]" or "[SiteC.com / SiteD.com]". Take the
                 // first (most specific) brand and strip domain suffixes so the token resolves to a known
                 // studio. Previously this produced e.g. "SiteA com / SiteB", which matched nothing.
-                var studioTitleToken = matchCollection[0].Groups["studiotitle"].Value.Split(StudioBrandSeparators)[0];
-                studioTitleToken = StudioDomainSuffixRegex.Replace(studioTitleToken, string.Empty);
+                var studioBrands = matchCollection[0].Groups["studiotitle"].Value.Split(StudioBrandSeparators);
+                var studioTitle = GetStudioTitle(studioBrands[0]);
 
-                var studioTitle = studioTitleToken.Replace('.', ' ').Replace('_', ' ');
-                studioTitle = RequestInfoRegex.Replace(studioTitle, "").Trim(' ');
+                // The other brands, and the parts of a sub-domain ("DirtyFuckers.staxus.com"), for when the first brand isn't a known studio
+                result.AlternativeStudioTitles = studioBrands.Select(b => StudioDomainSuffixRegex.Replace(b.Trim(), string.Empty))
+                                                             .SelectMany(b => new[] { b }.Concat(b.Contains('.') ? b.Split('.').Where(p => p.Length > 2 && !p.Equals("www", StringComparison.OrdinalIgnoreCase)) : Array.Empty<string>()))
+                                                             .Select(GetStudioTitle)
+                                                             .Where(t => t.IsNotNullOrWhiteSpace() && !t.Equals(studioTitle, StringComparison.OrdinalIgnoreCase))
+                                                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                             .ToList();
 
                 var lastSeasonEpisodeStringIndex = matchCollection[0].Groups["studiotitle"].EndIndex();
 
@@ -1115,6 +1147,14 @@ namespace NzbDrone.Core.Parser
                     result.IsDatelessScene = true;
                     result.Code = null;
                     result.ReleaseTokens = result.ReleaseTokens.Trim();
+
+                    // "[Site.com] Title / Alternative (Performers) [2017 г., tags]": the year is checked against the scene's
+                    if (matchCollection[0].Groups[TagYearConst].Success)
+                    {
+                        result.Year = int.Parse(matchCollection[0].Groups[TagYearConst].Value);
+                        result.ReleaseTokens = EmptyAlternativeTitleRegex.Replace(result.ReleaseTokens, " ").Trim();
+                    }
+
                     result.MovieTitles.Add(matchCollection[0].Value.StartsWith('[')
                         ? result.ReleaseTokens
                         : $"{studioTitle} - {result.ReleaseTokens}");

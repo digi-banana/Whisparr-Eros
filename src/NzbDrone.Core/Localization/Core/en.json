@@ -1094,6 +1094,8 @@
   "IndexerSettingsRequiredFlags": "Required Flags",
   "IndexerSettingsRequiredFlagsHelpText": "Select which indexer flags should be mandatory. Leave blank to use with all flags.",
   "IndexerSettingsRssUrl": "RSS URL",
+  "IndexerSettingsSceneTitleOnlySearch": "Search Scenes by Title Only",
+  "IndexerSettingsSceneTitleOnlySearchHelpText": "Search this indexer for scenes by their title alone, without the studio name or date. For indexers whose release names don't start with the studio, e.g. '[Site.com] Title (Performers) [Year, tags]'",
   "IndexerSettingsSeedRatio": "Seed Ratio",
   "IndexerSettingsSeedRatioHelpText": "The ratio a torrent should reach before stopping, empty uses the download client's default. Ratio should be at least 1.0 and follow the indexers rules",
   "IndexerSettingsSeedTime": "Seed Time",
