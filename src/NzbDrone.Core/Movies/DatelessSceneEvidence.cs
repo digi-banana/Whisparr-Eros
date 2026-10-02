@@ -147,6 +147,70 @@ namespace NzbDrone.Core.Movies
         }
 
         /// <summary>
+        /// True when the release names the scene title and one of the scene's performers (by name, StashDB alias or credited name)
+        /// as whole words in different places of the release name. A one-word title or name only counts where it stands on its own:
+        /// the scene "Alex" with performer "Alex" is not named by "Extra Credit - Alex Killborn &amp; Tyler Hill", where "Alex" is
+        /// the start of another performer's name and the title and the performer would be the same word.
+        /// </summary>
+        /// <param name="releaseTokens">The release name after the studio, e.g. "Shower Sex - Joey Mills &amp; Landon Vega".</param>
+        /// <param name="scene">The scene, with its credits loaded.</param>
+        public static bool HasSeparateTitleAndPerformer(string releaseTokens, Movie scene)
+        {
+            if (releaseTokens.IsNullOrWhiteSpace() || scene == null || scene.Title.IsNullOrWhiteSpace() || scene.MovieMetadata?.Value?.Credits == null)
+            {
+                return false;
+            }
+
+            var tokens = Tokenize(releaseTokens);
+            var titleWords = GetComparableWords(Tokenize(scene.Title));
+
+            if (titleWords.Count == 0)
+            {
+                return false;
+            }
+
+            var titleSpans = FindTitle(tokens, titleWords);
+
+            if (titleSpans.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var name in GetPerformerNames(scene.MovieMetadata.Value.Credits).SelectMany(n => n))
+            {
+                foreach (var span in FindAll(tokens, name))
+                {
+                    if (name.Count == 1 && !StandsAlone(tokens, span))
+                    {
+                        continue;
+                    }
+
+                    if (titleSpans.Any(t => t.End <= span.Start || span.End <= t.Start))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary> True when the release has the words of the scene title as whole words ("Alex" is not in "Alexander"). </summary>
+        public static bool ContainsTitle(string releaseTokens, string sceneTitle)
+        {
+            var titleWords = GetComparableWords(Tokenize(sceneTitle));
+
+            return titleWords.Count > 0 && FindAll(Tokenize(releaseTokens), titleWords).Any();
+        }
+
+        // The places the release names the title: its words as whole words, a one-word title on its own
+        // ("Roommates" is named by "Roommates - Kyle Ross", not by "Hot Roommates" or "Roommates Kyle")
+        private static List<(int Start, int End)> FindTitle(List<Token> tokens, List<string> titleWords)
+        {
+            return FindAll(tokens, titleWords).Where(s => titleWords.Count > 1 || StandsAlone(tokens, s)).ToList();
+        }
+
+        /// <summary>
         /// Compares the issue / part / scene / volume / episode / chapter numbers of the release and the scene title.
         /// Only numbers of a kind both carry are compared. For issue, volume and episode numbers a difference of one is neutral
         /// (studio sites and StashDB are often one issue apart) and a bigger difference is a conflict. Part, scene and chapter
@@ -271,6 +335,75 @@ namespace NzbDrone.Core.Movies
             }
 
             return null;
+        }
+
+        // The words of a text as compared between a release and a title: "&" and "+" read as "and", other punctuation is skipped
+        private static List<(int Index, string Text)> GetComparable(List<Token> tokens)
+        {
+            var words = new List<(int Index, string Text)>();
+
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Kind == TokenKind.Word)
+                {
+                    words.Add((i, tokens[i].Text));
+                }
+                else if (tokens[i].Kind == TokenKind.Joiner && tokens[i].Text != ",")
+                {
+                    words.Add((i, "and"));
+                }
+            }
+
+            return words;
+        }
+
+        private static List<string> GetComparableWords(List<Token> tokens)
+        {
+            return GetComparable(tokens).Select(w => w.Text).ToList();
+        }
+
+        // Every place the words are in the release, one after the other (punctuation between them aside), as token positions
+        private static List<(int Start, int End)> FindAll(List<Token> tokens, List<string> words)
+        {
+            var spans = new List<(int Start, int End)>();
+            var comparable = GetComparable(tokens);
+
+            if (words.Count == 0)
+            {
+                return spans;
+            }
+
+            for (var start = 0; start + words.Count <= comparable.Count; start++)
+            {
+                var found = true;
+
+                for (var i = 0; i < words.Count; i++)
+                {
+                    if (comparable[start + i].Text != words[i])
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+
+                if (found)
+                {
+                    spans.Add((comparable[start].Index, comparable[start + words.Count - 1].Index + 1));
+                }
+            }
+
+            return spans;
+        }
+
+        // Whether the words found are not part of a longer name or phrase: no other word right before or after them
+        private static bool StandsAlone(List<Token> tokens, (int Start, int End) span)
+        {
+            return !IsPlainWord(tokens, span.Start - 1) && !IsPlainWord(tokens, span.End);
+        }
+
+        private static bool IsPlainWord(List<Token> tokens, int index)
+        {
+            return index >= 0 && index < tokens.Count && tokens[index].Kind == TokenKind.Word && !tokens[index].IsJoiner;
         }
 
         // Whether the list of names goes on before the first (direction -1) or after the last (direction 1) performer found:

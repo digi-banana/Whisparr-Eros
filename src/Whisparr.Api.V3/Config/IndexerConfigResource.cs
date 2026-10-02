@@ -25,6 +25,7 @@ namespace Whisparr.Api.V3.Config
         public int PacedMissingSearchInterval { get; set; }
         public bool PacedMissingSearchIncludeMovies { get; set; }
         public bool PacedMissingSearchIncludeScenes { get; set; }
+        public bool StrictSceneNameMatching { get; set; }
     }
 
     public static class IndexerConfigResourceMapper
@@ -53,6 +54,7 @@ namespace Whisparr.Api.V3.Config
                 PacedMissingSearchInterval = model.PacedMissingSearchInterval,
                 PacedMissingSearchIncludeMovies = model.PacedMissingSearchIncludeMovies,
                 PacedMissingSearchIncludeScenes = model.PacedMissingSearchIncludeScenes,
+                StrictSceneNameMatching = model.StrictSceneNameMatching,
             };
         }
     }

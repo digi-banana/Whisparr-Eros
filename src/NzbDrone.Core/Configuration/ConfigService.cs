@@ -174,6 +174,12 @@ namespace NzbDrone.Core.Configuration
             set { SetValue("SearchStudioFormat", value); }
         }
 
+        public bool StrictSceneNameMatching
+        {
+            get { return GetValueBoolean("StrictSceneNameMatching", true); }
+            set { SetValue("StrictSceneNameMatching", value); }
+        }
+
         public int MaximumSize
         {
             get { return GetValueInt("MaximumSize", 0); }
