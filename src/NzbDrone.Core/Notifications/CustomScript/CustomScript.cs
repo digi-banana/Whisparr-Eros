@@ -124,15 +124,7 @@ namespace NzbDrone.Core.Notifications.CustomScript
             environmentVariables.Add("Whisparr_Download_Client", message.DownloadClientInfo?.Name ?? string.Empty);
             environmentVariables.Add("Whisparr_Download_Client_Type", message.DownloadClientInfo?.Type ?? string.Empty);
             environmentVariables.Add("Whisparr_Download_Id", message.DownloadId ?? string.Empty);
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioChannels", MediaInfoFormatter.FormatAudioChannels(movieFile.MediaInfo).ToString());
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioCodec", MediaInfoFormatter.FormatAudioCodec(movieFile.MediaInfo, null));
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioLanguages", movieFile.MediaInfo.AudioLanguages.Distinct().ConcatToString(" / "));
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Languages", movieFile.MediaInfo.AudioLanguages.ConcatToString(" / "));
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Height", movieFile.MediaInfo.Height.ToString());
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Width", movieFile.MediaInfo.Width.ToString());
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Subtitles", movieFile.MediaInfo.Subtitles.ConcatToString(" / "));
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_VideoCodec", MediaInfoFormatter.FormatVideoCodec(movieFile.MediaInfo, null));
-            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_VideoDynamicRangeType", MediaInfoFormatter.FormatVideoDynamicRangeType(movieFile.MediaInfo));
+            AddMediaInfo(environmentVariables, movieFile.MediaInfo);
             environmentVariables.Add("Whisparr_MovieFile_CustomFormat", string.Join("|", message.MovieInfo.CustomFormats));
             environmentVariables.Add("Whisparr_MovieFile_CustomFormatScore", message.MovieInfo.CustomFormatScore.ToString());
             environmentVariables.Add("Whisparr_Release_Indexer", message.Release?.Indexer);
@@ -364,6 +356,21 @@ namespace NzbDrone.Core.Notifications.CustomScript
             }
 
             return new ValidationResult(failures);
+        }
+
+        // A file can be imported without media info (ffprobe couldn't read it, or analysis is turned off);
+        // the script still runs, with these variables empty
+        private static void AddMediaInfo(StringDictionary environmentVariables, MediaInfoModel mediaInfo)
+        {
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioChannels", mediaInfo == null ? string.Empty : MediaInfoFormatter.FormatAudioChannels(mediaInfo).ToString());
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioCodec", mediaInfo == null ? string.Empty : MediaInfoFormatter.FormatAudioCodec(mediaInfo, null));
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_AudioLanguages", mediaInfo?.AudioLanguages?.Distinct().ConcatToString(" / ") ?? string.Empty);
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Languages", mediaInfo?.AudioLanguages?.ConcatToString(" / ") ?? string.Empty);
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Height", mediaInfo?.Height.ToString() ?? string.Empty);
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Width", mediaInfo?.Width.ToString() ?? string.Empty);
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_Subtitles", mediaInfo?.Subtitles?.ConcatToString(" / ") ?? string.Empty);
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_VideoCodec", mediaInfo == null ? string.Empty : MediaInfoFormatter.FormatVideoCodec(mediaInfo, null));
+            environmentVariables.Add("Whisparr_MovieFile_MediaInfo_VideoDynamicRangeType", mediaInfo == null ? string.Empty : MediaInfoFormatter.FormatVideoDynamicRangeType(mediaInfo));
         }
 
         private ProcessOutput ExecuteScript(StringDictionary environmentVariables)

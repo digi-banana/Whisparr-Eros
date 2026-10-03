@@ -320,9 +320,13 @@ namespace NzbDrone.Core.Parser
                     movieInfo = searchCriteria.Movie;
                 }
 
+                // The scene was found from the release name (studio, date, title, performers), the search only confirms it is the
+                // scene searched for. Reporting it as an ID match would block the import of every search grab whose downloaded file
+                // is named differently from the release ("Movie title mismatch ... matched to movie by ID"), as RSS grabs of the same
+                // release are not blocked.
                 if (movieInfo != null)
                 {
-                    return new FindMovieResult(movieInfo, MovieMatchType.Id);
+                    return new FindMovieResult(movieInfo, MovieMatchType.Title);
                 }
             }
             else

@@ -131,6 +131,35 @@ namespace NzbDrone.Core.Test.ParserTests.ParsingServiceTests
 
         [TestCase(true)]
         [TestCase(false)]
+        public void should_report_scene_found_from_release_name_as_title_match_in_a_search(bool interactiveSearch)
+        {
+            // An ID match blocks the import when the downloaded file is named differently from the release
+            var scene = Builder<Movie>.CreateNew()
+                                      .With(m => m.Title = "Tight Package")
+                                      .With(m => m.ForeignId = "4f0b7b0e-0000-0000-0000-000000000001")
+                                      .With(m => m.MovieMetadata.Value.ItemType = ItemType.Scene)
+                                      .Build();
+
+            var searchCriteria = new SceneSearchCriteria
+            {
+                Movie = scene,
+                InteractiveSearch = interactiveSearch
+            };
+
+            var parsedMovieInfo = Parser.Parser.ParseMovieTitle("Helix Studios - Tight Package - Max Carter & Ezra Michaels [720p].mp4");
+
+            Mocker.GetMock<IMovieService>()
+                  .Setup(s => s.FindSceneMatch(parsedMovieInfo, interactiveSearch, searchCriteria))
+                  .Returns(SceneMatchResult.Matched(scene));
+
+            var result = Subject.Map(parsedMovieInfo, "", 0, searchCriteria);
+
+            result.Movie.Should().Be(scene);
+            result.MovieMatchType.Should().Be(MovieMatchType.Title);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
         public void should_pass_interactive_search_to_scene_lookup(bool interactiveSearch)
         {
             var scene = Builder<Movie>.CreateNew()
