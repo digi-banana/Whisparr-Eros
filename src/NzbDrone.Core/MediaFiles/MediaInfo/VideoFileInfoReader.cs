@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
+using System.Threading;
 using FFMpegCore;
 using FFMpegCore.Exceptions;
 using NLog;
@@ -32,6 +33,10 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
         private static readonly string[] PqTransferFunctions = { "smpte2084" };
         private static readonly string[] ValidHdrTransferFunctions = HlgTransferFunctions.Concat(PqTransferFunctions).ToArray();
 
+        // ffprobe reads files over the network for remote storage (debrid or usenet mounts). Many at once, e.g. one per file of a large
+        // release folder on every import attempt, saturate the mount and stall streaming, so only three run at a time.
+        private static readonly SemaphoreSlim ProbeSlots = new (3, 3);
+
         public VideoFileInfoReader(IDiskProvider diskProvider, IConfigService configService, Logger logger)
         {
             _diskProvider = diskProvider;
@@ -57,6 +62,8 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
             }
 
             // TODO: Cache media info by path, mtime and length so we don't need to read files multiple times
+            ProbeSlots.Wait();
+
             try
             {
                 _logger.Debug("Getting media info from {0}", filename);
@@ -139,6 +146,10 @@ namespace NzbDrone.Core.MediaFiles.MediaInfo
             catch (Exception ex)
             {
                 _logger.Error(ex, "Unable to parse media info from file: {0}", filename);
+            }
+            finally
+            {
+                ProbeSlots.Release();
             }
 
             return null;

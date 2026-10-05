@@ -463,6 +463,14 @@ namespace NzbDrone.Core.MediaFiles.MovieImport.Manual
                 var file = message.Files[i];
                 try
                 {
+                    // A file without a scene (sent by a tool that couldn't tell which one) can't be imported: skip it
+                    // before reading the file, instead of failing on it, and probing its folder, on every retry
+                    if (file.MovieId <= 0)
+                    {
+                        _logger.Warn("Not importing {0}, no scene or movie was chosen for it", file.Path);
+                        continue;
+                    }
+
                     if (!_diskProvider.FileExists(file.Path))
                     {
                         _logger.Warn("File does not exist: {0}", file.Path);

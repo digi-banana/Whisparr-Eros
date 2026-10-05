@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
@@ -5,7 +6,9 @@ using NzbDrone.Common.Disk;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
 using NzbDrone.Core.MediaFiles.MovieImport.Manual;
+using NzbDrone.Core.Movies;
 using NzbDrone.Core.Test.Framework;
+using NzbDrone.Test.Common;
 
 namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Manual
 {
@@ -28,6 +31,24 @@ namespace NzbDrone.Core.Test.MediaFiles.MovieImport.Manual
             Subject.GetMediaFiles(null, "downloading", null, true).Should().BeEmpty();
 
             Mocker.GetMock<IDiskProvider>().Verify(v => v.FolderExists(It.IsAny<string>()), Times.Never());
+        }
+
+        [Test]
+        public void should_skip_a_file_without_a_scene_before_reading_it()
+        {
+            var command = new ManualImportCommand
+            {
+                Files = new List<ManualImportFile>
+                {
+                    new () { Path = "/downloads/release/scene.mp4", MovieId = 0, DownloadId = "ABC" }
+                }
+            };
+
+            Subject.Execute(command);
+
+            Mocker.GetMock<IDiskProvider>().Verify(v => v.FileExists(It.IsAny<string>()), Times.Never());
+            Mocker.GetMock<IMovieService>().Verify(v => v.GetMovie(It.IsAny<int>()), Times.Never());
+            ExceptionVerification.ExpectedWarns(1);
         }
     }
 }
