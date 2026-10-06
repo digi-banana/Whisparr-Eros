@@ -100,7 +100,8 @@ namespace NzbDrone.Core.Datastore
                   .Ignore(i => i.SupportsOnHealthIssue)
                   .Ignore(i => i.SupportsOnHealthRestored)
                   .Ignore(i => i.SupportsOnApplicationUpdate)
-                  .Ignore(i => i.SupportsOnManualInteractionRequired);
+                  .Ignore(i => i.SupportsOnManualInteractionRequired)
+                  .Ignore(i => i.SupportsOnReviewNeeded);
 
             Mapper.Entity<MetadataDefinition>("Metadata").RegisterModel()
                   .Ignore(x => x.ImplementationName)
