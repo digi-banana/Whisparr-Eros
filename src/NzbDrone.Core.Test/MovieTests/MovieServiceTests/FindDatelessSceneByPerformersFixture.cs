@@ -3,6 +3,7 @@ using System.Linq;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Credits;
 using NzbDrone.Core.Movies.Performers;
@@ -106,7 +107,8 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
             parsedMovieInfo.IsDatelessScene.Should().BeTrue();
             parsedMovieInfo.StudioTitle.Should().Be("FreshMen");
 
-            return Subject.FindSceneMatch(parsedMovieInfo, interactive, null);
+            // From a search: RSS only uses an exact title or StashId automatically, see FindDatelessSceneFixture
+            return Subject.FindSceneMatch(parsedMovieInfo, interactive, new MovieSearchCriteria { InteractiveSearch = interactive });
         }
 
         [TestCase("FreshMen - Issue 389 - Gene Allen and Ashton Montana.mp4", 1)]

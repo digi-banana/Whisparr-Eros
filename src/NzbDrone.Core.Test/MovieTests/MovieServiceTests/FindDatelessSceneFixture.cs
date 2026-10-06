@@ -200,7 +200,8 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
 
             parsedMovieInfo.IsDatelessScene.Should().BeTrue();
 
-            return Subject.FindSceneMatch(parsedMovieInfo, interactive, null);
+            // From a search: RSS only uses an exact title or StashId automatically, see FindDatelessSceneFixture
+            return Subject.FindSceneMatch(parsedMovieInfo, interactive, new MovieSearchCriteria { InteractiveSearch = interactive });
         }
 
         [TestCase("Helix Studios - Dakota Lovell [720p]", 4, MovieParseMatchType.PerformersTitle)]
@@ -235,6 +236,17 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
 
             match.Movie.Should().NotBeNull();
             match.ReviewCandidates.Should().BeEmpty();
+        }
+
+        [Test]
+        public void should_offer_title_and_performer_match_from_rss_for_review()
+        {
+            var parsedMovieInfo = Parser.Parser.ParseMovieTitle("Helix Studios - Shower Sex - Joey Mills & Landon Vega [720p].mp4");
+
+            var match = Subject.FindSceneMatch(parsedMovieInfo, false, null);
+
+            match.Movie.Should().BeNull();
+            match.ReviewCandidates.Should().ContainSingle().Which.Movie.Id.Should().Be(1);
         }
 
         [TestCase("Helix Studios - Locker Room [720p]", 5, 6)]

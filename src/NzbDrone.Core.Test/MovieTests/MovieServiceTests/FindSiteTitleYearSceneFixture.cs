@@ -3,6 +3,7 @@ using System.Linq;
 using FluentAssertions;
 using Moq;
 using NUnit.Framework;
+using NzbDrone.Core.IndexerSearch.Definitions;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Movies.Credits;
 using NzbDrone.Core.Movies.Performers;
@@ -61,7 +62,8 @@ namespace NzbDrone.Core.Test.MovieTests.MovieServiceTests
 
             parsedMovieInfo.IsDatelessScene.Should().BeTrue();
 
-            return Subject.FindSceneMatch(parsedMovieInfo, interactive, null);
+            // From a search: RSS only uses an exact title or StashId automatically, see FindDatelessSceneFixture
+            return Subject.FindSceneMatch(parsedMovieInfo, interactive, new MovieSearchCriteria { InteractiveSearch = interactive });
         }
 
         [TestCase("[HelixStudios.net] Joy Ride / 5003 (Blake Mitchell, Noah White) [2017 ., Blowjob, Anal, Big Dick, 1080p]", 1)]

@@ -22,7 +22,7 @@ namespace NzbDrone.Core.Test.ParserTests
             var result = Parser.Parser.ParseMovieTitle(title);
 
             result.Should().NotBeNull();
-            result.IsScene.Should().BeTrue();
+            result.IsScene.Should().BeFalse();
             result.IsDatelessScene.Should().BeTrue();
             result.StudioTitle.Should().Be(studio);
             result.ReleaseTokens.Should().Be(releaseTokens);
