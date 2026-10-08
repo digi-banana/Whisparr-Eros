@@ -929,7 +929,8 @@ namespace NzbDrone.Core.Parser
 
             // Quality tags left in the name once the trailing ones are cut off mean a group release, not a dateless scene: "Studio - Title 1080p [GRP]",
             // "Studio - Title (1080p) [GRP]", "Some Movie - Part 2 WEB-DL 1080p x264-GROUP". Leave it to the patterns after this one, which parse it as on eros-develop.
-            if (isDateless && LeftoverReleaseTagRegex.IsMatch(DatelessTagTailRegex.Replace(releaseTitle, string.Empty)))
+            // Not for "[Site.com] Title (Performers) [2017 ., tags, 1080p]", whose tag block holds the resolution.
+            if (isDateless && !matchCollection[0].Groups[TagYearConst].Success && LeftoverReleaseTagRegex.IsMatch(DatelessTagTailRegex.Replace(releaseTitle, string.Empty)))
             {
                 return null;
             }
